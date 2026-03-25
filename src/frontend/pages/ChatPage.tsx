@@ -148,7 +148,7 @@ export function ChatPage({ threadId }: { threadId: string }) {
 
   // Render chat interface
   return (
-    <main className="flex-1 h-full w-full">
+    <main className="flex-1 h-full w-full min-w-0 overflow-hidden">
       <ChatErrorBoundary
         chatId={threadId}
         onRetry={handleRetry}

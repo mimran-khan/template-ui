@@ -326,21 +326,21 @@ export function AIMessageRenderer({ message, latestTodos, skipWriteTodos }: AIMe
       for (let idx = 0; idx < nonTodoToolCalls.length; idx++) {
         const toolCall = nonTodoToolCalls[idx];
         elements.push(
-          <div key={`${message.id || 'tc'}-${idx}`} className="bg-blue-900/20 border border-blue-700/30 rounded-lg overflow-hidden w-full">
+          <div key={`${message.id || 'tc'}-${idx}`} className="bg-blue-900/20 border border-blue-700/30 rounded-lg overflow-hidden w-full min-w-0">
             <button
               onClick={() => toggleExpand(`${message.id}-${idx}`)}
-              className="w-full flex items-center justify-between p-4 hover:bg-blue-800/20 transition-colors"
+              className="w-full flex items-center justify-between p-4 hover:bg-blue-800/20 transition-colors min-w-0"
             >
-              <div className="flex items-center gap-3">
-                <Settings className="w-5 h-5 text-blue-400" />
-                <div className="text-left">
+              <div className="flex items-center gap-3 min-w-0">
+                <Settings className="w-5 h-5 text-blue-400 shrink-0" />
+                <div className="text-left min-w-0">
                   <div className="text-sm font-medium text-blue-100 flex items-center gap-2">
                     {toolCall.name}
                     {
                       (toolCall as any).content ? (
-                        <CheckCircle className="w-4 h-4 text-green-400" />
+                        <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
                       ) : (
-                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
                       )
                     }
                   </div>
@@ -351,16 +351,16 @@ export function AIMessageRenderer({ message, latestTodos, skipWriteTodos }: AIMe
                 </div>
               </div>
               {expandedItems.has(`${message.id}-${idx}`) ? (
-                <ChevronDown className="w-4 h-4 text-blue-400" />
+                <ChevronDown className="w-4 h-4 text-blue-400 shrink-0" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-blue-400" />
+                <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />
               )}
             </button>
 
             {expandedItems.has(`${message.id}-${idx}`) && (
-              <div className="px-4 pb-4 border-t border-blue-700/20">
+              <div className="px-4 pb-4 border-t border-blue-700/20 min-w-0 overflow-hidden">
                 <div className="text-xs text-blue-200/60 mb-2">Arguments:</div>
-                <pre className="text-xs text-blue-100 bg-blue-950/30 p-2 rounded overflow-auto">
+                <pre className="text-xs text-blue-100 bg-blue-950/30 p-2 rounded overflow-auto max-h-60 whitespace-pre-wrap break-all">
                   {JSON.stringify(toolCall.args, null, 2)}
                 </pre>
                 <div className="text-xs text-blue-200/60 mb-2">
@@ -368,7 +368,7 @@ export function AIMessageRenderer({ message, latestTodos, skipWriteTodos }: AIMe
                     (toolCall as any).content ? 'Result:' : 'Running...:'
                   }
                 </div>
-                <pre className="text-xs text-green-100 bg-green-950/30 p-2 rounded overflow-auto">
+                <pre className="text-xs text-green-100 bg-green-950/30 p-2 rounded overflow-auto max-h-60 whitespace-pre-wrap break-all">
                   {JSON.stringify((toolCall as any).content, null, 2)}
                 </pre>
               </div>
@@ -385,14 +385,14 @@ export function AIMessageRenderer({ message, latestTodos, skipWriteTodos }: AIMe
     if (isToolCallResult) {
       return (
         <>
-          <div key={message.id} className="bg-green-900/20 border border-green-700/30 rounded-lg overflow-hidden ml-6 w-full">
+          <div key={message.id} className="bg-green-900/20 border border-green-700/30 rounded-lg overflow-hidden ml-6 w-full min-w-0">
             <button
               onClick={() => toggleExpand(message.id || '')}
-              className="w-full flex items-center justify-between p-3 hover:bg-green-800/20 transition-colors"
+              className="w-full flex items-center justify-between p-3 hover:bg-green-800/20 transition-colors min-w-0"
             >
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-4 h-4 text-green-400" />
-                <div className="text-left">
+              <div className="flex items-center gap-3 min-w-0">
+                <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                <div className="text-left min-w-0">
                   <div className="text-sm font-medium text-green-100">
                     {message.name} result
                   </div>
@@ -402,16 +402,16 @@ export function AIMessageRenderer({ message, latestTodos, skipWriteTodos }: AIMe
                 </div>
               </div>
               {expandedItems.has(message.id || '') ? (
-                <ChevronDown className="w-4 h-4 text-green-400" />
+                <ChevronDown className="w-4 h-4 text-green-400 shrink-0" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-green-400" />
+                <ChevronRight className="w-4 h-4 text-green-400 shrink-0" />
               )}
             </button>
 
             {expandedItems.has(message.id || '') && (
-              <div className="px-3 pb-3 border-t border-green-700/20">
+              <div className="px-3 pb-3 border-t border-green-700/20 min-w-0 overflow-hidden">
                 <div className="text-xs text-green-200/60 mb-2">Result:</div>
-                <pre className="text-xs text-green-100 bg-green-950/30 p-2 rounded overflow-auto max-h-40">
+                <pre className="text-xs text-green-100 bg-green-950/30 p-2 rounded overflow-auto max-h-60 whitespace-pre-wrap break-all">
                   {typeof message.content === 'string' ? message.content : JSON.stringify(message.content, null, 2)}
                 </pre>
               </div>
@@ -431,7 +431,7 @@ export function AIMessageRenderer({ message, latestTodos, skipWriteTodos }: AIMe
 
 
   return (
-    <div className="space-y-2 mb-4 w-full">
+    <div className="space-y-1 mb-1 w-full min-w-0">
       {renderMessage}
     </div>
   );
@@ -468,7 +468,7 @@ export function ChatMessagesView({
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 overflow-y-auto" ref={scrollAreaRef}>
-        <div className="p-4 md:p-6 space-y-2 w-full mx-auto pt-16">
+        <div className="p-4 md:p-6 lg:p-8 space-y-1 w-full mx-auto">
           {messages.map((message, index) => {
             if (message.type === 'tool' && message.name === 'write_todos') {
               return null;
@@ -488,7 +488,7 @@ export function ChatMessagesView({
                       message={message}
                     />
                   ) : (
-                    <div className="w-full max-w-full">
+                    <div className="w-full min-w-0">
                       <AIMessageRenderer
                         message={message}
                         latestTodos={isFirstTodo ? todoMeta.latestTodos : undefined}
