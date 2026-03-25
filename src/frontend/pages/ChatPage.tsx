@@ -98,7 +98,7 @@ export function ChatPage({ threadId }: { threadId: string }) {
   // Show loading while chats are being loaded from localStorage
   if (chatsLoading) {
     return (
-      <main className="flex-1 h-full max-w-4xl mx-auto">
+      <main className="flex-1 h-full w-full">
         <div className="flex flex-col items-center justify-center h-full">
           <div className="flex flex-col items-center justify-center gap-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-400"></div>
@@ -112,7 +112,7 @@ export function ChatPage({ threadId }: { threadId: string }) {
   // Handle case where chat doesn't exist (after chats have loaded)
   if (threadId && !currentChat) {
     return (
-      <main className="flex-1 h-full max-w-4xl mx-auto">
+      <main className="flex-1 h-full w-full">
         <div className="flex flex-col items-center justify-center h-full">
           <div className="flex flex-col items-center justify-center gap-4">
             <h1 className="text-2xl text-neutral-400 font-bold">Chat Not Found</h1>
@@ -129,7 +129,7 @@ export function ChatPage({ threadId }: { threadId: string }) {
   // Handle error state
   if (error) {
     return (
-      <main className="flex-1 h-full max-w-4xl mx-auto">
+      <main className="flex-1 h-full w-full">
         <div className="flex flex-col items-center justify-center h-full">
           <div className="flex flex-col items-center justify-center gap-4">
             <h1 className="text-2xl text-red-400 font-bold">Error</h1>
@@ -148,7 +148,7 @@ export function ChatPage({ threadId }: { threadId: string }) {
 
   // Render chat interface
   return (
-    <main className="flex-1 h-full max-w-4xl mx-auto">
+    <main className="flex-1 h-full w-full">
       <ChatErrorBoundary
         chatId={threadId}
         onRetry={handleRetry}

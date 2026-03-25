@@ -468,7 +468,7 @@ export function ChatMessagesView({
   return (
     <div className="flex flex-col h-full">
       <ScrollArea className="flex-1 overflow-y-auto" ref={scrollAreaRef}>
-        <div className="p-4 md:p-6 space-y-2 max-w-4xl mx-auto pt-16">
+        <div className="p-4 md:p-6 space-y-2 w-full mx-auto pt-16">
           {messages.map((message, index) => {
             if (message.type === 'tool' && message.name === 'write_todos') {
               return null;
@@ -488,7 +488,7 @@ export function ChatMessagesView({
                       message={message}
                     />
                   ) : (
-                    <div className="w-full max-w-[85%] md:max-w-[80%]">
+                    <div className="w-full max-w-full">
                       <AIMessageRenderer
                         message={message}
                         latestTodos={isFirstTodo ? todoMeta.latestTodos : undefined}
