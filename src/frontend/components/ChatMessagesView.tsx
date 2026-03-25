@@ -1,18 +1,73 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { ScrollArea } from "./ui/scroll-area";
-import { CheckCircle, ChevronDown, ChevronRight, Copy, CopyCheck, Loader2, Settings } from "lucide-react";
+import { CheckCircle, ChevronDown, ChevronRight, Loader2, Settings } from "lucide-react";
 import { InputForm } from "./InputForm";
-import { useState, ReactNode, useMemo } from "react";
+import { useState, useEffect, useRef, ReactNode, useMemo } from "react";
 import { cn } from "../lib/utils";
 import { Badge } from "./ui/badge";
-import {
-  ProcessedEvent,
-} from "./ActivityTimeline";
-import { StreamEvent } from "../hooks/useDataStream";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import mermaid from "mermaid";
 import { TodoListRenderer, isWriteTodosCall, extractTodos } from "./TodoListRenderer";
 import type { TodoItem } from "./TodoListRenderer";
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: "dark",
+  securityLevel: "loose",
+});
+
+let mermaidIdCounter = 0;
+
+function MermaidDiagram({ chart }: { chart: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [svg, setSvg] = useState<string>("");
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const id = `mermaid-${++mermaidIdCounter}`;
+
+    mermaid
+      .render(id, chart.trim())
+      .then(({ svg: renderedSvg }) => {
+        if (!cancelled) setSvg(renderedSvg);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(String(err));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chart]);
+
+  if (error) {
+    return (
+      <pre className="bg-red-950/30 border border-red-700/30 p-3 rounded-lg text-xs text-red-300 my-3 overflow-x-auto">
+        {chart}
+      </pre>
+    );
+  }
+
+  if (!svg) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-neutral-500 my-3">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Rendering diagram...
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="my-3 overflow-x-auto bg-neutral-900/50 rounded-lg p-4"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
 
 // Markdown component props type from former ReportView
 type MdComponentProps = {
@@ -82,28 +137,45 @@ const mdComponents = {
       {children}
     </blockquote>
   ),
-  code: ({ className, children, ...props }: MdComponentProps) => (
-    <code
-      className={cn(
-        "bg-neutral-900 rounded px-1 py-0.5 font-mono text-xs",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </code>
-  ),
-  pre: ({ className, children, ...props }: MdComponentProps) => (
-    <pre
-      className={cn(
-        "bg-neutral-900 p-3 rounded-lg overflow-x-auto font-mono text-xs my-3",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </pre>
-  ),
+  code: ({ className, children, ...props }: MdComponentProps) => {
+    const match = /language-(\w+)/.exec(className || "");
+    const lang = match?.[1];
+    const codeText = String(children).replace(/\n$/, "");
+
+    if (lang === "mermaid") {
+      return <MermaidDiagram chart={codeText} />;
+    }
+
+    return (
+      <code
+        className={cn(
+          "bg-neutral-900 rounded px-1 py-0.5 font-mono text-xs",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  },
+  pre: ({ className, children, ...props }: MdComponentProps) => {
+    const child = children as React.ReactElement<{ className?: string }>;
+    if (child?.props?.className?.includes("language-mermaid")) {
+      return <>{children}</>;
+    }
+
+    return (
+      <pre
+        className={cn(
+          "bg-neutral-900 p-3 rounded-lg overflow-x-auto font-mono text-xs my-3",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </pre>
+    );
+  },
   hr: ({ className, ...props }: MdComponentProps) => (
     <hr className={cn("border-neutral-600 my-4", className)} {...props} />
   ),
@@ -162,7 +234,6 @@ const mdComponents = {
 // Props for HumanMessageBubble
 interface HumanMessageBubbleProps {
   message: Message;
-  mdComponents: typeof mdComponents;
 }
 
 // HumanMessageBubble Component
@@ -173,7 +244,7 @@ const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({
     <div
       className={`text-white rounded-3xl break-words min-h-7 bg-neutral-700 max-w-[100%] sm:max-w-[90%] p-3 rounded-br-xs`}
     >
-      <ReactMarkdown components={mdComponents}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
         {typeof message.content === "string"
           ? message.content
           : JSON.stringify(message.content)}
@@ -185,21 +256,16 @@ const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({
 // Props for AiMessageBubble
 interface AiMessageBubbleProps {
   message: Message;
-  mdComponents?: typeof mdComponents;
-  handleCopy?: (text: string, messageId: string) => void;
-  copiedMessageId?: string | null;
 }
 
 // AiMessageBubble Component
 const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
   message,
-  handleCopy = () => { },
-  copiedMessageId = '',
 }) => {
   return (
     <div className={`relative break-words flex flex-col w-full`}>
       <div className="w-full prose prose-invert max-w-none">
-        <ReactMarkdown components={mdComponents}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
           {typeof message.content === "string"
             ? message.content
             : JSON.stringify(message.content)}
@@ -211,13 +277,10 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
 
 interface ChatMessagesViewProps {
   messages: Message[];
-  streamEvents?: StreamEvent[];
   isLoading: boolean;
   scrollAreaRef: React.RefObject<HTMLDivElement | null>;
   onSubmit: (inputValue: string) => void;
   onCancel: () => void;
-  liveActivityEvents: ProcessedEvent[];
-  historicalActivities: Record<string, ProcessedEvent[]>;
 }
 
 interface AIMessageRendererProps {
@@ -377,24 +440,11 @@ export function AIMessageRenderer({ message, latestTodos, skipWriteTodos }: AIMe
 
 export function ChatMessagesView({
   messages,
-  streamEvents = [],
   isLoading,
   scrollAreaRef,
   onSubmit,
   onCancel,
 }: ChatMessagesViewProps) {
-  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-
-  const handleCopy = async (text: string, messageId: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedMessageId(messageId);
-      setTimeout(() => setCopiedMessageId(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
-    }
-  };
-
   const todoMeta = useMemo(() => {
     let firstTodoIndex = -1;
     let latestTodos: TodoItem[] = [];
@@ -436,7 +486,6 @@ export function ChatMessagesView({
                   {message.type === "human" ? (
                     <HumanMessageBubble
                       message={message}
-                      mdComponents={mdComponents}
                     />
                   ) : (
                     <div className="w-full max-w-[85%] md:max-w-[80%]">
@@ -452,39 +501,6 @@ export function ChatMessagesView({
             );
           })}
 
-          {/* {streamEvents && streamEvents.length > 0 && (
-            <div className="mb-3">
-              <StreamEventRenderer
-                events={streamEvents}
-                isLoading={isLoading}
-              />
-            </div>
-          )} */}
-          {
-            // isLoading &&
-            //   (messages.length === 0 ||
-            //     messages[messages.length - 1].type === "human") && (
-            //     <div className="flex items-start gap-3 mt-3">
-            //       {" "}
-            //       {/* AI message row structure */}
-            //       <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-neutral-800 text-neutral-100 rounded-bl-none w-full min-h-[56px]">
-            //         {liveActivityEvents.length > 0 ? (
-            //           <div className="text-xs">
-            //             <ActivityTimeline
-            //               processedEvents={liveActivityEvents}
-            //               isLoading={true}
-            //             />
-            //           </div>
-            //         ) : (
-            //           <div className="flex items-center justify-start h-full">
-            //             <Loader2 className="h-5 w-5 animate-spin text-neutral-400 mr-2" />
-            //             <span>Processing...</span>
-            //           </div>
-            //         )}
-            //       </div>
-            //     </div>
-            //   )
-          }
         </div>
         {isLoading && (
           <div className="flex items-center gap-2 text-xs text-neutral-500 justify-center py-2">
