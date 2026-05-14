@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from '../Sidebar';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { useChat } from '../../contexts/ChatContext';
@@ -13,6 +13,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { chats, deleteChat, renameChat, createNewChat } = useChat();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   
   // Get user data from window.USER_DATA
   const userData = useMemo(() => {
@@ -53,8 +54,8 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const handleDeleteChat = (chatId: string) => {
     deleteChat(chatId);
-    // Navigate to home if we're currently on the deleted chat
-    if (window.location.pathname === `/chat/${chatId}`) {
+    const chatSuffix = `/chat/${chatId}`;
+    if (pathname === chatSuffix || pathname.endsWith(chatSuffix)) {
       const remainingChats = chats.filter(chat => chat.id !== chatId);
       if (remainingChats.length > 0) {
         navigate(`/chat/${remainingChats[0].id}`);

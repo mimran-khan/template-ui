@@ -19,6 +19,8 @@ export interface UserData {
 export interface AppData {
   apiUrl: string;
   refreshableToken: string;
+  /** URL pathname prefix for the SPA (e.g. /org/agent/chat); "/" when served at host root. */
+  basePath?: string;
 }
 
 // Extend the Window interface to include USER_DATA and APP_DATA
