@@ -145,7 +145,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     dispatch({ type: 'ADD_CHAT', payload: newChat });
     dispatch({ type: 'SET_ERROR', payload: null });
 
-    // Navigate to new chat
+    // Basename-rooted: `/chat/...` resolves under deployer/public-url prefix when set.
     navigate(`/chat/${newChatId}`);
 
     return newChatId;

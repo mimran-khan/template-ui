@@ -1,12 +1,7 @@
 import * as path from "node:path";
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import authCheckPlugin from "../plugins/auth-check.plugin.js";
-import { agentHost } from "../utils/config.js";
-
-const appData = {
-  apiUrl: agentHost, // Agent backend URL - frontend calls agent directly
-  refreshableToken: "", // Unused - token comes from USER_DATA.accessToken
-};
+import { buildInjectedAppData } from "../injected-app-data.js";
 
 async function routes(fastify: FastifyInstance) {
   await fastify.register(authCheckPlugin);
@@ -48,7 +43,7 @@ async function routes(fastify: FastifyInstance) {
                         <div id="root"></div>
                         <script>
                         window.USER_DATA = ${JSON.stringify(userData || {})}
-                        window.APP_DATA = ${JSON.stringify(appData)}
+                        window.APP_DATA = ${JSON.stringify(buildInjectedAppData())}
                         </script>
                         <script src="/dist/frontend/main.umd.js"></script>
                         

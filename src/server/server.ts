@@ -3,6 +3,9 @@ import { clientRoutes } from "./router/client.router.js";
 import { apiRoutes } from "./router/api.router.js";
 import { authPlugin } from "./plugins/auth.plugin.js";
 
+/** Runtime SPA bootstrap; merged into HTML as `window.APP_DATA` in client.router. */
+export { buildInjectedAppData } from "./injected-app-data.js";
+
 interface LoggerConfig {
   development: {
     transport: {
