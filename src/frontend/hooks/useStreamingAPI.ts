@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AIMessage, Message } from '@langchain/langgraph-sdk';
 
 import type { StreamEvent } from '@/hooks/useDataStream';
+import type { InterruptInfo, StructuredInterrupt } from '@/types/deep-agent';
 import {
   StreamingManager,
   type StreamCallback,
@@ -376,7 +377,7 @@ export function useStreamingAPI(threadId: string) {
               dispatch(
                 updateStreamingState({
                   chatId: threadId,
-                  state: { pendingInterrupt: interrupt },
+                  state: { pendingInterrupt: interrupt as InterruptInfo | StructuredInterrupt },
                 }),
               );
             },
@@ -546,7 +547,7 @@ export function useStreamingAPI(threadId: string) {
           }
         },
         onInterrupt(interrupt) {
-          dispatch(updateStreamingState({ chatId: threadId, state: { pendingInterrupt: interrupt } }));
+          dispatch(updateStreamingState({ chatId: threadId, state: { pendingInterrupt: interrupt as InterruptInfo | StructuredInterrupt } }));
         },
         onError(error) {
           dispatch(updateStreamingState({ chatId: threadId, state: { error: error.message, isLoading: false, isConnected: false } }));
