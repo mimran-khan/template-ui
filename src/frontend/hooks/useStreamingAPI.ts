@@ -377,7 +377,7 @@ export function useStreamingAPI(threadId: string) {
               dispatch(
                 updateStreamingState({
                   chatId: threadId,
-                  state: { pendingInterrupt: interrupt as InterruptInfo | StructuredInterrupt },
+                  state: { pendingInterrupt: interrupt as unknown as InterruptInfo | StructuredInterrupt },
                 }),
               );
             },
@@ -547,7 +547,7 @@ export function useStreamingAPI(threadId: string) {
           }
         },
         onInterrupt(interrupt) {
-          dispatch(updateStreamingState({ chatId: threadId, state: { pendingInterrupt: interrupt as InterruptInfo | StructuredInterrupt } }));
+          dispatch(updateStreamingState({ chatId: threadId, state: { pendingInterrupt: interrupt as unknown as InterruptInfo | StructuredInterrupt } }));
         },
         onError(error) {
           dispatch(updateStreamingState({ chatId: threadId, state: { error: error.message, isLoading: false, isConnected: false } }));
