@@ -485,6 +485,97 @@ export function useStreamingAPI(threadId: string) {
     [dispatch, threadId, memories, activeRules, handleStreamActivityStatus],
   );
 
+  const resumeWithCommand = useCallback(
+    async (command: { resume: unknown }) => {
+      const manager = managerRef.current;
+      if (!manager || !threadId) return;
+
+      userCancelledRef.current = false;
+      setRetryCount(0);
+      setIsStreamStale(false);
+
+      const token = typeof window.USER_DATA.accessToken === 'string' ? window.USER_DATA.accessToken : undefined;
+      const userId =
+        typeof window.USER_DATA.preferred_username === 'string'
+          ? window.USER_DATA.preferred_username
+          : '';
+      const apiUrl = typeof window.APP_DATA?.apiUrl === 'string' ? window.APP_DATA.apiUrl : '';
+
+      dispatch(
+        updateStreamingState({
+          chatId: threadId,
+          state: {
+            currentRunId: `run-${Date.now()}`,
+            error: null,
+            pendingInterrupt: null,
+          },
+        }),
+      );
+
+      const callbacks: StreamCallback = {
+        onToken(content) {
+          lastTokenTimeRef.current = Date.now();
+          setIsStreamStale(false);
+          if (streamClockRef.current.firstTokenTime == null) {
+            streamClockRef.current.firstTokenTime = Date.now();
+          }
+          if (!isStreamingTokensRef.current) {
+            const message: AIMessage = {
+              type: 'ai',
+              content,
+              tool_calls: [],
+              id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            };
+            dispatch(appendMessageToChat({ chatId: threadId, message }));
+            isStreamingTokensRef.current = true;
+            return;
+          }
+          dispatch(updateLastMessageInChat({ chatId: threadId, content }));
+        },
+        onMessage(m) {
+          isStreamingTokensRef.current = false;
+          if (m.type === 'human') return;
+          const isToolCallingAi =
+            m.type === 'ai' && Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
+          if (isToolCallingAi) {
+            dispatch(appendMessageToChat({ chatId: threadId, message: m }));
+            return;
+          }
+          if (m.type === 'tool') {
+            dispatch(mergeToolResult({ chatId: threadId, toolCallId: m.tool_call_id, content: m.content }));
+          }
+        },
+        onInterrupt(interrupt) {
+          dispatch(updateStreamingState({ chatId: threadId, state: { pendingInterrupt: interrupt } }));
+        },
+        onError(error) {
+          dispatch(updateStreamingState({ chatId: threadId, state: { error: error.message, isLoading: false, isConnected: false } }));
+        },
+        onStatusChange(status) {
+          handleStreamActivityStatus(status);
+          if (status === 'cancelled' || status === 'error') return;
+          const partial = nextStreamingPartialForStatus(status);
+          if (partial) dispatch(updateStreamingState({ chatId: threadId, state: partial }));
+        },
+        onDone() {
+          dispatch(resolveAllPendingToolCalls({ chatId: threadId }));
+        },
+        onMcpStatus(evt) {
+          setMcpEvents((prev) => [...prev, evt]);
+        },
+        onMetadata(data) {
+          setTraceId(data.trace_id);
+        },
+      };
+
+      await manager.resume(
+        { threadId, userId, apiUrl, token, command },
+        callbacks,
+      );
+    },
+    [dispatch, threadId, handleStreamActivityStatus],
+  );
+
   const stop = useCallback(() => {
     userCancelledRef.current = true;
     managerRef.current?.cancel();
@@ -508,6 +599,7 @@ export function useStreamingAPI(threadId: string) {
     taskSteps: streamingState.taskSteps,
     submit,
     stop,
+    resumeWithCommand,
     setMessages,
     retryCount,
     isStreamStale,

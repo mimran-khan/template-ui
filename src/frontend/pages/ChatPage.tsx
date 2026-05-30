@@ -20,6 +20,9 @@ import { useRateLimitState } from '../hooks/useRateLimitState';
 import { ChatMessagesView } from '../components/ChatMessagesView';
 import { ChatErrorBoundary } from '../components/ChatErrorBoundary';
 import { InterruptBanner } from '../components/InterruptBanner';
+import { BtwBar } from '../components/BtwBar';
+import { ToolApprovalCard } from '../components/ToolApprovalCard';
+import { PlanReviewPanel } from '../components/PlanReviewPanel';
 import { TaskProgressStepper } from '../components/TaskProgressStepper';
 import { TasksSidebar } from '../components/TasksSidebar';
 import { DebugPanel } from '../components/DebugPanel';
@@ -34,6 +37,11 @@ import {
   exportAsMarkdown,
   slugifyExportBase,
 } from '../services/export-chat';
+import {
+  isStructuredInterrupt,
+  type HITLResponse,
+  type PlanDecision,
+} from '../types/deep-agent';
 
 export function ChatPage({ threadId }: { threadId: string }) {
   const dispatch = useAppDispatch();
@@ -323,6 +331,34 @@ export function ChatPage({ threadId }: { threadId: string }) {
     [thread, threadId, currentChat, dispatch],
   );
 
+  const handleToolApprovalResume = useCallback(
+    async (response: HITLResponse) => {
+      if (!threadId) return;
+      dispatch(updateStreamingState({ chatId: threadId, state: { pendingInterrupt: null } }));
+      try {
+        await thread.resumeWithCommand({ resume: response });
+      } catch (err) {
+        console.error('Failed to resume after tool approval:', err);
+        dispatch(addToast({ title: 'Failed to resume', variant: 'danger' }));
+      }
+    },
+    [thread, threadId, dispatch],
+  );
+
+  const handlePlanDecisionResume = useCallback(
+    async (decision: PlanDecision) => {
+      if (!threadId) return;
+      dispatch(updateStreamingState({ chatId: threadId, state: { pendingInterrupt: null } }));
+      try {
+        await thread.resumeWithCommand({ resume: decision });
+      } catch (err) {
+        console.error('Failed to resume after plan decision:', err);
+        dispatch(addToast({ title: 'Failed to resume', variant: 'danger' }));
+      }
+    },
+    [thread, threadId, dispatch],
+  );
+
   const handleInterruptDismiss = useCallback(() => {
     dispatch(
       updateStreamingState({
@@ -408,12 +444,30 @@ export function ChatPage({ threadId }: { threadId: string }) {
             <TaskProgressStepper messages={thread.messages} isLoading={thread.isLoading} />
           )}
           {thread.pendingInterrupt && (
-            <InterruptBanner
-              interrupt={thread.pendingInterrupt}
-              onResume={handleInterruptResume}
-              onDismiss={handleInterruptDismiss}
-            />
+            isStructuredInterrupt(thread.pendingInterrupt) ? (
+              thread.pendingInterrupt.interrupt_type === 'tool_approval' ? (
+                <ToolApprovalCard
+                  interrupt={thread.pendingInterrupt}
+                  threadId={threadId}
+                  onResume={handleToolApprovalResume}
+                  onDismiss={handleInterruptDismiss}
+                />
+              ) : (
+                <PlanReviewPanel
+                  interrupt={thread.pendingInterrupt}
+                  onResume={handlePlanDecisionResume}
+                  onDismiss={handleInterruptDismiss}
+                />
+              )
+            ) : (
+              <InterruptBanner
+                interrupt={thread.pendingInterrupt as import('../types/deep-agent').InterruptInfo}
+                onResume={handleInterruptResume}
+                onDismiss={handleInterruptDismiss}
+              />
+            )
           )}
+          <BtwBar threadId={threadId} isStreaming={thread.isLoading} />
           <ChatMessagesView
             key={threadId}
             messages={thread.messages}

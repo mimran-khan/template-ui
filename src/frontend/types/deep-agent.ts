@@ -19,6 +19,65 @@ export interface InterruptInfo {
   resumable: boolean;
 }
 
+export type InterruptType = 'tool_approval' | 'plan_review' | 'text';
+
+export interface ActionRequest {
+  tool_name: string;
+  tool_args: Record<string, unknown>;
+}
+
+export interface ReviewConfig {
+  allowed_decisions: string[];
+  description?: string;
+}
+
+export interface ToolApprovalInterrupt {
+  interrupt_type: 'tool_approval';
+  action_requests: ActionRequest[];
+  review_configs: ReviewConfig[];
+  supports_approve_all: boolean;
+  resumable: boolean;
+}
+
+export interface PlanStep {
+  step: number;
+  description: string;
+  tool: string | null;
+}
+
+export interface PlanReviewInterrupt {
+  interrupt_type: 'plan_review';
+  plan_steps: PlanStep[];
+  resumable: boolean;
+}
+
+export type StructuredInterrupt = ToolApprovalInterrupt | PlanReviewInterrupt;
+
+export interface AddedStep {
+  description: string;
+  insert_after: number;
+}
+
+export interface PlanDecision {
+  type: 'plan_decision';
+  approved_steps: number[];
+  rejected_steps: number[];
+  added_steps: AddedStep[];
+  feedback?: string;
+}
+
+export interface HITLResponse {
+  decisions: Array<{ type: 'approve' | 'reject' }>;
+}
+
+export function isStructuredInterrupt(
+  content: unknown,
+): content is StructuredInterrupt {
+  if (!content || typeof content !== 'object') return false;
+  const c = content as Record<string, unknown>;
+  return c.interrupt_type === 'tool_approval' || c.interrupt_type === 'plan_review';
+}
+
 export interface TaskStep {
   id: string;
   name: string;

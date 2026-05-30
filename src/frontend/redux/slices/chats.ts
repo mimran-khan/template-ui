@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { Message } from '@langchain/langgraph-sdk';
-import type { SubAgentInfo, InterruptInfo, TaskStep } from '../../types/deep-agent';
+import type { SubAgentInfo, InterruptInfo, StructuredInterrupt, TaskStep } from '../../types/deep-agent';
 
 export interface StreamingState {
   isLoading: boolean;
@@ -9,7 +9,7 @@ export interface StreamingState {
   error: string | null;
   currentRunId: string | null;
   activeSubAgent: SubAgentInfo | null;
-  pendingInterrupt: InterruptInfo | null;
+  pendingInterrupt: InterruptInfo | StructuredInterrupt | null;
   taskSteps: TaskStep[];
 }
 

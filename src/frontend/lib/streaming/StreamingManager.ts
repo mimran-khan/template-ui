@@ -17,10 +17,7 @@ export interface StreamRequest {
 
 export type StreamStatus = 'idle' | 'connecting' | 'streaming' | 'error' | 'cancelled';
 
-export interface InterruptPayload {
-  value: string;
-  resumable: boolean;
-}
+export type InterruptPayload = Record<string, unknown>;
 
 export type McpStreamStatusEvent = {
   tool: string;
@@ -192,6 +189,89 @@ export class StreamingManager {
         }
       }
 
+      if (err.name === 'AbortError') {
+        this.setStatus('cancelled');
+        callbacks.onStatusChange('cancelled');
+      } else {
+        this.setStatus('error');
+        callbacks.onStatusChange('error');
+        callbacks.onError(err);
+      }
+    } finally {
+      reader?.releaseLock?.();
+      this.abortController = null;
+    }
+  }
+
+  async resume(
+    request: Omit<StreamRequest, 'message'> & { command: { resume: unknown } },
+    callbacks: StreamCallback,
+  ): Promise<void> {
+    this.cancel();
+    this.processor.reset();
+    this.processedChunkIds.clear();
+
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
+    this.setStatus('connecting');
+    callbacks.onStatusChange('connecting');
+
+    const streamUrl = request.apiUrl
+      ? `${request.apiUrl}/v1/stream`
+      : '/api/proxy/agent/v1/stream';
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (request.token) headers['X-Token'] = request.token;
+
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+
+    try {
+      const body: Record<string, unknown> = {
+        message: '',
+        thread_id: request.threadId || 'default-thread',
+        session_id: request.threadId || 'default-session',
+        user_id: request.userId,
+        stream_tokens: true,
+        command: request.command,
+      };
+
+      const response = await fetch(streamUrl, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(body),
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      reader = response.body?.getReader();
+      if (!reader) throw new Error('Failed to get reader from response body');
+
+      this.setStatus('streaming');
+      callbacks.onStatusChange('streaming');
+
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (value !== undefined) {
+          this.handleEvents(this.processor.feed(decoder.decode(value, { stream: true })), callbacks);
+        }
+        if (done) break;
+      }
+      const flushText = decoder.decode();
+      if (flushText.length > 0) {
+        this.handleEvents(this.processor.feed(flushText), callbacks);
+      }
+
+      this.setStatus('idle');
+      callbacks.onStatusChange('idle');
+      callbacks.onDone();
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       if (err.name === 'AbortError') {
         this.setStatus('cancelled');
         callbacks.onStatusChange('cancelled');

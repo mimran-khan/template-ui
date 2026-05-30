@@ -37,6 +37,7 @@ interface StreamRequestBody {
   session_id?: string;
   stream_tokens?: boolean;
   resume?: boolean;
+  command?: { resume: unknown };
   memories?: string[];
   rules?: string[];
 }
@@ -272,7 +273,7 @@ async function proxyRoutes(fastify: FastifyInstance) {
         return reply.status(401).send({ error: 'Not authenticated' });
       }
 
-      const { message, thread_id, user_id, resume: isResume, memories, rules } = request.body;
+      const { message, thread_id, user_id, resume: isResume, command: structuredCommand, memories, rules } = request.body;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -316,7 +317,9 @@ async function proxyRoutes(fastify: FastifyInstance) {
           assistant_id: 'agent',
           stream_mode: ['messages'],
         };
-        if (isResume) {
+        if (structuredCommand?.resume != null) {
+          runBody.command = structuredCommand;
+        } else if (isResume) {
           runBody.command = { resume: message };
         } else {
           runBody.input = { messages: [{ role: 'human', content: message }] };
@@ -505,12 +508,22 @@ async function proxyRoutes(fastify: FastifyInstance) {
               );
               if (interrupted) {
                 const firstInterrupt = (interrupted as any).interrupts[0];
-                const value = typeof firstInterrupt?.value === 'string'
-                  ? firstInterrupt.value
-                  : JSON.stringify(firstInterrupt?.value ?? 'Action required');
+                const rawValue = firstInterrupt?.value;
+                const isStructured =
+                  rawValue != null &&
+                  typeof rawValue === 'object' &&
+                  !Array.isArray(rawValue) &&
+                  ('interrupt_type' in rawValue || 'plan_steps' in rawValue || 'action_requests' in rawValue);
+
+                const interruptContent = isStructured
+                  ? { ...rawValue, resumable: true }
+                  : {
+                      value: typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue ?? 'Action required'),
+                      resumable: true,
+                    };
                 const interruptChunk = {
                   type: 'interrupt',
-                  content: { value, resumable: true },
+                  content: interruptContent,
                   chunk_id: chunkId,
                 };
                 reply.raw.write(`data: ${JSON.stringify(interruptChunk)}\n\n`);
@@ -618,6 +631,76 @@ async function proxyRoutes(fastify: FastifyInstance) {
         return reply.status(502).send({ error: 'Failed to connect to agent service' });
       }
     }
+  );
+
+  fastify.post<{ Body: { thread_id: string; message: string; user_id?: string } }>(
+    '/proxy/agent/btw',
+    async (request, reply) => {
+      const traceId = (request.headers['x-trace-id'] as string) || randomUUID();
+      const { accessToken, refreshFailed } = await ensureFreshTokens(fastify, request);
+
+      if (refreshFailed) return sessionExpiredReply(reply);
+      if (!accessToken && process.env.AUTH_ENABLED === 'true') {
+        return reply.status(401).send({ error: 'Not authenticated' });
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Trace-ID': traceId,
+      };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+      try {
+        const agentUrl = `${agentHost}/btw`;
+        const agentResponse = await fetch(agentUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(request.body),
+        });
+        reply.header('X-Trace-ID', traceId);
+        reply.status(agentResponse.status);
+        const responseBody = await agentResponse.text();
+        return reply.send(responseBody);
+      } catch (error) {
+        fastify.log.error({ traceId, error }, 'BTW proxy error');
+        return reply.status(502).send({ error: 'Failed to send /btw message' });
+      }
+    },
+  );
+
+  fastify.post<{ Body: { thread_id: string; action: string } }>(
+    '/proxy/agent/trust',
+    async (request, reply) => {
+      const traceId = (request.headers['x-trace-id'] as string) || randomUUID();
+      const { accessToken, refreshFailed } = await ensureFreshTokens(fastify, request);
+
+      if (refreshFailed) return sessionExpiredReply(reply);
+      if (!accessToken && process.env.AUTH_ENABLED === 'true') {
+        return reply.status(401).send({ error: 'Not authenticated' });
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Trace-ID': traceId,
+      };
+      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+      try {
+        const agentUrl = `${agentHost}/trust`;
+        const agentResponse = await fetch(agentUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(request.body),
+        });
+        reply.header('X-Trace-ID', traceId);
+        reply.status(agentResponse.status);
+        const responseBody = await agentResponse.text();
+        return reply.send(responseBody);
+      } catch (error) {
+        fastify.log.error({ traceId, error }, 'Trust proxy error');
+        return reply.status(502).send({ error: 'Failed to update trust level' });
+      }
+    },
   );
 
   fastify.post('/proxy/agent/feedback', async (request, reply) => {
